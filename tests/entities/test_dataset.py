@@ -214,3 +214,39 @@ class OpenMLDatasetTest(unittest.TestCase):
         self.assertEqual(len(categorical), 19998)
         self.assertListEqual(categorical, [False] * 19998)
         self.assertEqual(y.shape, (2, ))
+
+    def test_dataset_attribute_labels(self):
+        X, attribute_labels = self.dataset.get_dataset(
+            return_attribute_labels=True)
+        self.assertIsInstance(X, np.ndarray)
+        self.assertIsInstance(attribute_labels, list)
+        for idx in [3, 4, 8, 32, 33]:
+            self.assertIsNone(attribute_labels[idx])
+        for idx, lengths in enumerate([9, 3, 8, 0, 0, 1, 3, 5, 0, 1, 2, 4, 5, 1,
+                                       1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 4, 1,
+                                       1, 1, 1, 2, 0, 0, 0, 2, 4, 3, 6]):
+            if lengths == 0:
+                continue
+            else:
+                self.assertEqual(len(attribute_labels[idx]), lengths)
+
+    def test_dataset_attribute_labels_and_targets(self):
+        X, y, attribute_labels_X, attribute_labels_y = self.dataset.get_dataset(
+            return_attribute_labels=True, target='class')
+        self.assertIsInstance(X, np.ndarray)
+        self.assertIsInstance(attribute_labels_X, list)
+        self.assertIsInstance(attribute_labels_y, list)
+        for idx in [3, 4, 8, 32, 33]:
+            self.assertIsNone(attribute_labels_X[idx])
+        for idx, lengths in enumerate([9, 3, 8, 0, 0, 1, 3, 5, 0, 1, 2, 4, 5, 1,
+                                       1, 1, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 4, 1,
+                                       1, 1, 1, 2, 0, 0, 0, 2, 4, 3]):
+            if lengths == 0:
+                continue
+            else:
+                self.assertEqual(len(attribute_labels_X[idx]), lengths)
+
+        self.assertEqual(len(attribute_labels_y), 1)
+        self.assertEqual(len(attribute_labels_y[0]), 6)
+        self.assertEqual(attribute_labels_y,
+                         [{'2': 1, '3': 2, 'U': 5, '4': 3, '5': 4, '1': 0}])

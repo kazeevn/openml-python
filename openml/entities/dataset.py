@@ -60,7 +60,7 @@ class OpenMLDataset(object):
             logger.debug("Data pickle file already exists.")
         else:
             try:
-                data = self.get_arff()
+                data, conversors = self.get_arff()
             except OSError as e:
                 logger.critical("Please check that the data file %s is there "
                                 "and can be read.", self.data_file)
@@ -69,6 +69,10 @@ class OpenMLDataset(object):
             categorical = [False if type(type_) != list else True
                                 for name, type_ in data['attributes']]
             attribute_names = [name for name, type_ in data['attributes']]
+            attribute_labels = [None if not hasattr(conversor,
+                                                    '_encoded_values')
+                                else conversor._encoded_values
+                                for conversor in conversors]
 
             if isinstance(data['data'], tuple):
                 X = data['data']
@@ -82,7 +86,8 @@ class OpenMLDataset(object):
                 raise Exception()
 
             with open(self.data_pickle_file, "wb") as fh:
-                pickle.dump((X, categorical, attribute_names), fh, -1)
+                pickle.dump((X, attribute_labels,
+                             categorical, attribute_names), fh, -1)
             logger.debug("Saved dataset %d: %s to file %s" %
                          (self.id, self.name, self.data_pickle_file))
 
@@ -112,7 +117,7 @@ class OpenMLDataset(object):
 
         def decode_arff(fh):
             decoder = arff.ArffDecoder()
-            return decoder.decode(fh, encode_nominal=True)
+            return decoder.decode(fh, encode_nominal=True), decoder._conversors
 
         if filename[-3:] == ".gz":
             with gzip.open(filename) as fh:
@@ -123,9 +128,10 @@ class OpenMLDataset(object):
 
     ############################################################################
     def get_dataset(self, target=None, target_dtype=int, include_row_id=False,
-                   include_ignore_attributes=False,
-                   return_categorical_indicator=False,
-                   return_attribute_names=False):
+                    include_ignore_attributes=False,
+                    return_categorical_indicator=False,
+                    return_attribute_names=False,
+                    return_attribute_labels=False):
         rval = []
 
         path = self.data_pickle_file
@@ -134,7 +140,8 @@ class OpenMLDataset(object):
                              "location %s " % (self.name, path))
         else:
             with open(path, "rb") as fh:
-                data, categorical, attribute_names = pickle.load(fh)
+                data, attribute_labels, categorical, attribute_names = \
+                    pickle.load(fh)
 
         to_exclude = []
         if include_row_id is False:
@@ -164,6 +171,8 @@ class OpenMLDataset(object):
             categorical = [cat for cat, k in zip(categorical, keep) if k]
             attribute_names = [att for att, k in
                                zip(attribute_names, keep) if k]
+            attribute_labels = [att for att, k in
+                                zip(attribute_labels, keep) if k]
 
         if target is None:
             rval.append(data)
@@ -182,8 +191,12 @@ class OpenMLDataset(object):
 
                 categorical = [cat for cat, t in
                                zip(categorical, targets) if not t]
-                attribute_names = [att for att, k in
-                                   zip(attribute_names, targets) if not k]
+                attribute_names = [att for att, t in
+                                   zip(attribute_names, targets) if not t]
+                attribute_labels_X = [att for att, t in
+                                      zip(attribute_labels, targets) if not t]
+                attribute_labels_y = [att for att, t in
+                                      zip(attribute_labels, targets) if t]
             except KeyError as e:
                 import sys
                 sys.stdout.flush()
@@ -199,6 +212,12 @@ class OpenMLDataset(object):
             rval.append(categorical)
         if return_attribute_names:
             rval.append(attribute_names)
+        if return_attribute_labels:
+            if target is None:
+                rval.append(attribute_labels)
+            else:
+                rval.append(attribute_labels_X)
+                rval.append(attribute_labels_y)
 
         if len(rval) == 1:
             return rval[0]
