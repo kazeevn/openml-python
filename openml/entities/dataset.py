@@ -110,16 +110,26 @@ class OpenMLDataset(object):
         if bits != 64 and os.path.getsize(filename) > 120000000:
             return NotImplementedError("File too big")
 
-        def decode_arff(fh):
+        if self.format.lower() == 'arff':
+            output_format = arff.DENSE
+        elif self.format.lower() == 'sparse_arff':
+            output_format = arff.COO
+
+        def decode_arff(fh, output_format):
             decoder = arff.ArffDecoder()
-            return decoder.decode(fh, encode_nominal=True)
+            data = decoder.decode(fh, encode_nominal=True,
+                                  return_type=output_format)
+            if scipy.sparse.isspmatrix(data):
+                return data.tocsr()
+            else:
+                return data
 
         if filename[-3:] == ".gz":
             with gzip.open(filename) as fh:
-                return decode_arff(fh)
+                return decode_arff(fh, output_format)
         else:
             with open(filename) as fh:
-                return decode_arff(fh)
+                return decode_arff(fh, output_format)
 
     ############################################################################
     def get_dataset(self, target=None, target_dtype=int, include_row_id=False,
